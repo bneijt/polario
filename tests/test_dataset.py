@@ -63,3 +63,5 @@ def test_read_partitions(example_ds_1: Dataset, example_df_1: pl.DataFrame) -> N
 def test_partion_columns_should_be_string(example_ds_1: Dataset) -> None:
     df = example_ds_1.read()
     assert df.schema == {"v": pl.Int64, "p1": pl.Utf8, "p2": pl.Utf8}
+    assert df.shape == (4,3)
+
