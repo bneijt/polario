@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "plio"
+version = "0.1.0"
+description = "Polars IO"
+authors = ["Bram Neijt <bram@neijt.nl>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+polars = "^0.16.8"
+fsspec = "^2023.1.0"
+pyarrow = "^11.0.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = {version = "^23.1.0", allow-prereleases = true}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
