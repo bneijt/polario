@@ -28,6 +28,7 @@ jobs:
         run: |
           poetry run black --check plio tests
           poetry run mypy
-      - name: run tests
+      - name: test
         run: |
           poetry run pytest
+          poetry build
