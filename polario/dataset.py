@@ -159,3 +159,22 @@ class HiveDataset:
             path="/".join([self.location.path] + path_elements)
         )
         return urlunsplit(ploc)
+
+    def upsert(self, upsert_df: pl.Dataframe, key_columns: list[str]) -> None:
+        """Upsert the given dataframe into the dataset.
+
+        This will partition the dataframe and for each partition, load the partition, merge
+        the dataframe and write back to the dataset.
+
+        Args:
+            upsert_df (pl.Dataframe): Dataframe to upsert into the dataset
+            on (pl.Dataframe): Dataframe to upsert into the dataset
+        """
+        # Split dataset into partitions
+        partitions = upsert_df.select(self.partition_columns).unique()
+        for partition_values in partitions.to_dicts():
+            # Read the partition into memory
+            partition_df = self.read_partition(partition_values=partition_values)
+            # Update partition_df with new values from upsert_df
+            stable_df = partition_df.join(upsert_df, on=key_columns, how="anti")
+            self.write(pl.concat([stable_df, upsert_df]))
