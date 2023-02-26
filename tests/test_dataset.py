@@ -5,7 +5,7 @@ from typing import Iterable
 import polars as pl
 import pytest
 
-from plio.dataset import HiveDataset
+from polario.dataset import HiveDataset
 
 
 @pytest.fixture
