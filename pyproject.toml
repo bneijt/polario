@@ -5,6 +5,7 @@ description = "Polars IO"
 authors = ["Bram Neijt <bram@neijt.nl>"]
 readme = "README.md"
 license = "Apache-2.0"
+homepage = "https://bneijt.github.io/polario/"
 repository = "https://github.com/bneijt/polario"
 classifiers = [
     "Intended Audience :: Developers",
@@ -19,7 +20,7 @@ pyarrow = "^11.0.0"
 
 
 [tool.poetry.group.dev.dependencies]
-black = {version = "^23.1.0", allow-prereleases = true}
+black = { version = "^23.1.0", allow-prereleases = true }
 mypy = "^1.0.1"
 pytest = "^7.2.1"
 pdoc = "^13.0.0"
