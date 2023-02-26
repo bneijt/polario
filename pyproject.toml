@@ -23,6 +23,7 @@ black = {version = "^23.1.0", allow-prereleases = true}
 mypy = "^1.0.1"
 pytest = "^7.2.1"
 pdoc = "^13.0.0"
+twine = "^4.0.2"
 
 [build-system]
 requires = ["poetry-core"]
