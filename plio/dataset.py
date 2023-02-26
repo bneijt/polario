@@ -1,3 +1,4 @@
+
 from typing import Iterable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
@@ -8,7 +9,7 @@ import pyarrow.dataset
 
 
 class HiveDataset:
-    """Dataset handle for a hive parquet dataset"""
+    """Dataset handle for a Hive partitioned set of Parquet files"""
 
     def __init__(
         self,
