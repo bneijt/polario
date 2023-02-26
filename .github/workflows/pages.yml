@@ -1,12 +1,9 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Deploy pdoc content to Pages
+name: pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches: [$default-branch]
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
