@@ -1,9 +1,11 @@
-from plio.dataset import HiveDataset
-import pytest
-import polars as pl
 import os
 import tempfile
 from typing import Iterable
+
+import polars as pl
+import pytest
+
+from plio.dataset import HiveDataset
 
 
 @pytest.fixture
@@ -79,6 +81,12 @@ def test_read_partion_should_read_single_partition(example_ds_1: HiveDataset) ->
         example_ds_1.read_partition({"p1": "not_there", "p2": "not_there"})
 
     partition_df = example_ds_1.read_partition({"p1": "1", "p2": "a"})
-    assert partition_df.shape == (1, 3), "This partition should contain only a single row and all columns"
+    assert partition_df.shape == (
+        1,
+        3,
+    ), "This partition should contain only a single row and all columns"
     partition_df = example_ds_1.read_partition({"p1": "2", "p2": "a"})
-    assert partition_df.shape == (2, 3), "This partition should contain two rows and all columns"
+    assert partition_df.shape == (
+        2,
+        3,
+    ), "This partition should contain two rows and all columns"

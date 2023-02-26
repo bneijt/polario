@@ -14,7 +14,16 @@ pyarrow = "^11.0.0"
 
 [tool.poetry.group.dev.dependencies]
 black = {version = "^23.1.0", allow-prereleases = true}
+mypy = "^1.0.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+files = "plio,tests"
+ignore_missing_imports = true
+show_error_codes = true

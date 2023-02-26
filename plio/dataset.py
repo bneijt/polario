@@ -1,10 +1,10 @@
-from typing import Iterable
+from typing import Iterable, Optional
 from urllib.parse import urlsplit, urlunsplit
+
 import fsspec
 import polars as pl
-import pyarrow.dataset
-from typing import Optional
 import pyarrow as pa
+import pyarrow.dataset
 
 
 class HiveDataset:
@@ -70,7 +70,6 @@ class HiveDataset:
                     ]
                 )
             )
-        MAX_ROWS_PER_GROUP = 1024 * 1024
         pyarrow.dataset.write_dataset(
             table,
             self.location.geturl(),
