@@ -1,5 +1,5 @@
 from typing import Iterable
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 import fsspec
 import polars as pl
 import pyarrow.dataset
@@ -7,17 +7,22 @@ from typing import Optional
 import pyarrow as pa
 
 
-class Dataset:
+class HiveDataset:
     """Dataset handle for a hive parquet dataset"""
 
-    def __init__(self, base_url: str, partition_columns: Optional[list[str]] = None, max_rows_per_file = 1048576):
+    def __init__(
+        self,
+        base_url: str,
+        partition_columns: Optional[list[str]] = None,
+        max_rows_per_file=1048576,
+    ):
         """Create a dataset handle at the given configuration
 
         Args:
             base_url (str): The url the dataset is located, the scheme of this url will be tested against fsspec to check if it is accessible.
             partition_columns (Optional[list[str]], optional): List of columns names used for partitioning. If this list if empty or None, no partitioning will be performed. Defaults to None.
             max_rows_per_file (int, optional): The maximum number of rows per parquet file on disk. Defaults to 1048576.
-        """        
+        """
         self.location = urlsplit(base_url)
         fsspec.filesystem(self.location.scheme)
         self.partition_columns = partition_columns or []
@@ -94,3 +99,49 @@ class Dataset:
         for partition_expression in partition_expressions.values():
             yield pl.DataFrame(ds.filter(partition_expression).to_table())
 
+    def read_partition(self, partition_values: dict[str, str]) -> pl.DataFrame:
+        """Read a single partition without doing a scan of the whole dataset. This is efficient, but also quite hacky.
+
+        Args:
+            partition_values (dict[str, str]): A dictionary of values of each partition column
+
+        Returns:
+            pl.DataFrame: The read dataframe
+        """
+        partition_location = self.partition_location(partition_values=partition_values)
+        fs = fsspec.filesystem(self.location.scheme)
+        parquet_files = [
+            fragment_location
+            for fragment_location in fs.ls(partition_location, detail=False)
+            if fragment_location.endswith(".parquet")
+        ]
+        return pl.concat(
+            [pl.read_parquet(parquet_file) for parquet_file in parquet_files]
+        ).with_columns(
+            [
+                pl.lit(parcol_value).alias(parcol_name)
+                for parcol_name, parcol_value in partition_values.items()
+            ]
+        )
+
+    def partition_location(self, partition_values: dict[str, str]) -> str:
+        """Generate a hive partitioning url based on the dataset location and the given partition values.
+        This method requires all partition columns to be mentioned and have a value.
+
+        Args:
+            partition_values (dict[str, str]): Partition column values
+
+        Returns:
+            str: Location of the hive partition
+        """
+        if not set(self.partition_columns) == partition_values.keys():
+            raise ValueError(
+                f"All partition columns need to be part of the partition selection, got {partition_values.keys()}, require {self.partition_columns}"
+            )
+        path_elements = [
+            f"{pc}={partition_values.get(pc)}" for pc in self.partition_columns
+        ]
+        ploc = self.location._replace(
+            path="/".join([self.location.path] + path_elements)
+        )
+        return urlunsplit(ploc)
