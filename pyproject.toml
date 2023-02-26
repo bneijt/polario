@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "plio"
+name = "polario"
 version = "0.0.1"
 description = "Polars IO"
 authors = ["Bram Neijt <bram@neijt.nl>"]
 readme = "README.md"
 license = "Apache-2.0"
-repository = "https://github.com/bneijt/plio"
+repository = "https://github.com/bneijt/polario"
 classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
@@ -33,6 +33,6 @@ build-backend = "poetry.core.masonry.api"
 profile = "black"
 
 [tool.mypy]
-files = "plio,tests"
+files = "polario,tests"
 ignore_missing_imports = true
 show_error_codes = true

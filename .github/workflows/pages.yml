@@ -41,7 +41,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
       - run: poetry install
       - name: run pdoc
-        run: poetry run pdoc --output-directory public plio
+        run: poetry run pdoc --output-directory public polario
       - uses: actions/upload-pages-artifact@v1
         with:
           path: "public"

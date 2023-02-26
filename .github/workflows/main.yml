@@ -26,7 +26,7 @@ jobs:
       - run: poetry install
       - name: static analysis
         run: |
-          poetry run black --check plio tests
+          poetry run black --check polario tests
           poetry run mypy
       - name: test
         run: |
