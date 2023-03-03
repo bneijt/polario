@@ -1,4 +1,5 @@
 """The main dataset package"""
+from enum import Enum
 from typing import Iterable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
@@ -6,6 +7,19 @@ import fsspec
 import polars as pl
 import pyarrow as pa
 import pyarrow.dataset
+
+
+class ExistingDataBehavior(Enum):
+    """Controls how the dataset will handle data that already exists in
+    the destination. See `pyarrow.dataset.write_dataset` for more information
+    """
+
+    ERROR = "error"
+    """raise an error if any data exists in the destination"""
+    OVERWRITE_OR_IGNORE = "overwrite_or_ignore"
+    """ignore any existing data and will overwrite files with the same name as an output file"""
+    DELETE_MATCHING = "delete_matching"
+    """The first time each partition directory is encountered the entire directory will be deleted"""
 
 
 class HiveDataset:
@@ -51,7 +65,7 @@ class HiveDataset:
     def write(
         self,
         dataframe: pl.DataFrame,
-        existing_data_behavior: str = "delete_matching",
+        existing_data_behavior: ExistingDataBehavior = ExistingDataBehavior.DELETE_MATCHING,
     ) -> None:
         table = dataframe.to_arrow()
 
@@ -77,7 +91,7 @@ class HiveDataset:
             format="parquet",
             partitioning=self.partition_columns,
             partitioning_flavor="hive",
-            existing_data_behavior=existing_data_behavior,
+            existing_data_behavior=existing_data_behavior.value,
             max_rows_per_group=self.max_rows_per_file,
             max_rows_per_file=self.max_rows_per_file,
         )
