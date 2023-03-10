@@ -1,6 +1,7 @@
 """The main dataset package"""
 from enum import Enum
-from typing import Iterable, Optional
+from functools import reduce
+from typing import Iterable, Optional, Sequence
 from urllib.parse import urlsplit, urlunsplit
 
 import fsspec
@@ -160,7 +161,9 @@ class HiveDataset:
         )
         return urlunsplit(ploc)
 
-    def upsert(self, upsert_df: pl.Dataframe, key_columns: list[str]) -> None:
+    def update(
+        self, other_df: pl.DataFrame, on: Sequence[str], how: str = "left"
+    ) -> None:
         """Upsert the given dataframe into the dataset.
 
         This will partition the dataframe and for each partition, load the partition, merge
@@ -170,11 +173,15 @@ class HiveDataset:
             upsert_df (pl.Dataframe): Dataframe to upsert into the dataset
             on (pl.Dataframe): Dataframe to upsert into the dataset
         """
-        # Split dataset into partitions
-        partitions = upsert_df.select(self.partition_columns).unique()
+        partitions = other_df.select(self.partition_columns).unique()
         for partition_values in partitions.to_dicts():
-            # Read the partition into memory
-            partition_df = self.read_partition(partition_values=partition_values)
-            # Update partition_df with new values from upsert_df
-            stable_df = partition_df.join(upsert_df, on=key_columns, how="anti")
-            self.write(pl.concat([stable_df, upsert_df]))
+            partition_filter = [
+                pl.col(pcol) == pval for pcol, pval in partition_values.items()
+            ]
+            other_partition_df = other_df.filter(
+                reduce(lambda a, b: a & b, partition_filter[1:], partition_filter[0])
+            )
+            updated_partition_df = self.read_partition(
+                partition_values=partition_values
+            ).update(other_partition_df, on=on, how=how)
+            self.write(updated_partition_df)

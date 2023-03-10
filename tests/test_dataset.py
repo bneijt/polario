@@ -8,6 +8,11 @@ import pytest
 from polario.dataset import HiveDataset
 
 
+def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
+    assert a.columns == b.columns, f"Colums should match: {reason}"
+    assert a.to_dict(as_series=False) == b.to_dict(as_series=False), reason
+
+
 @pytest.fixture
 def example_df_1() -> pl.DataFrame:
     return pl.from_dicts(
@@ -15,7 +20,7 @@ def example_df_1() -> pl.DataFrame:
             {"p1": 1, "p2": "a", "v": 1},
             {"p1": 1, "p2": "b", "v": 1},
             {"p1": 2, "p2": "a", "v": 1},
-            {"p1": 2, "p2": "a", "v": 1},
+            {"p1": 2, "p2": "a", "v": 2},
         ]
     )
 
@@ -90,3 +95,29 @@ def test_read_partion_should_read_single_partition(example_ds_1: HiveDataset) ->
         2,
         3,
     ), "This partition should contain two rows and all columns"
+
+
+def test_update(example_df_1: pl.DataFrame) -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = HiveDataset(tempdir, partition_columns=["p1", "p2"], max_rows_per_file=1)
+        ds.write(example_df_1)
+
+        before_update = ds.read()
+        ds.update(example_df_1, on=example_df_1.columns)
+        assert_equal(
+            before_update, ds.read()
+        ), "Update with itself should not have changed anything"
+
+        new_row = pl.from_dicts(
+            [
+                {"p1": 1, "p2": "a", "v": 4},
+            ]
+        )
+        ds.update(new_row, on=example_df_1.columns)
+        assert_equal(
+            ds.read(),
+            example_df_1,
+            "Should not have updated anything, because there is no match",
+        )
+
+        # updated_d.read().to_dicts() == example_df_1.to_dicts() + new_row.to_dicts(), "Should have added a new unique row"
