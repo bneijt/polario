@@ -1,6 +1,7 @@
 """The main dataset package"""
 from enum import Enum
-from typing import Iterable, Optional
+from functools import reduce
+from typing import Iterable, Optional, Sequence
 from urllib.parse import urlsplit, urlunsplit
 
 import fsspec
@@ -67,6 +68,18 @@ class HiveDataset:
         dataframe: pl.DataFrame,
         existing_data_behavior: ExistingDataBehavior = ExistingDataBehavior.DELETE_MATCHING,
     ) -> None:
+        """Write the given dataframe to the dataset
+
+        The default behavior expects you to write dataframes with full partitions.
+
+        Args:
+            dataframe (pl.DataFrame): DataFrame to write to this dataset
+            existing_data_behavior (ExistingDataBehavior, optional): What to do when a partition from the dataframe already exists. Defaults to ExistingDataBehavior.DELETE_MATCHING.
+
+        Raises:
+            ValueError: When the partition columns are not strings, see `HiveDataset.assert_partition_columns_are_string`
+        """
+        self.assert_partition_columns_are_string(dataframe)
         table = dataframe.to_arrow()
 
         if self.partition_columns:
@@ -121,6 +134,8 @@ class HiveDataset:
 
         Returns:
             pl.DataFrame: The read dataframe
+        Raises:
+            ValueError: When a value for a partition column is missing
         """
         partition_location = self.partition_location(partition_values=partition_values)
         fs = fsspec.filesystem(self.location.scheme)
@@ -147,6 +162,8 @@ class HiveDataset:
 
         Returns:
             str: Location of the hive partition
+        Raises:
+            ValueError: When a value for a partition column is missing
         """
         if not set(self.partition_columns) == partition_values.keys():
             raise ValueError(
@@ -159,3 +176,57 @@ class HiveDataset:
             path="/".join([self.location.path] + path_elements)
         )
         return urlunsplit(ploc)
+
+    def assert_partition_columns_are_string(self, df: pl.DataFrame) -> None:
+        """Raise a value error if any of the partition columns are not `polars.Utf8`
+
+        This is important, because the partition column values are only stored on the filesystem
+        as directory names, this means they will always be cast to string and read back as string again.
+
+        Args:
+            df (pl.DataFrame): Dataframe to check
+        Raises:
+            ValueError: When the partition columns are not of type `polars.Utf8`.
+        """
+        wrong_columns = [
+            (col_name, col_type)
+            for col_name, col_type in df.schema.items()
+            if col_name in self.partition_columns and col_type != pl.Utf8
+        ]
+        if wrong_columns:
+            raise ValueError(
+                f"Partition columns must be of type string for dataset. Wrong columns are {wrong_columns}"
+            )
+
+    def update(
+        self, other_df: pl.DataFrame, on: Sequence[str], how: str = "left"
+    ) -> None:
+        """Upsert the given dataframe into the dataset.
+
+        This will partition the dataframe and for each partition, load the partition, merge
+        the dataframe and write back to the dataset.
+
+        Args:
+            upsert_df (pl.Dataframe): Dataframe to upsert into the dataset
+            on (pl.Dataframe): Dataframe to upsert into the dataset
+        Raises:
+            ValueError: When the partition columns are not of type `polars.Utf8`.
+        """
+        self.assert_partition_columns_are_string(other_df)
+        partitions = other_df.select(self.partition_columns).unique()
+        for partition_values in partitions.to_dicts():
+            # Filter other_df on partition values for the partition we are about to update
+            partition_matching_expressions = [
+                pl.col(pcol) == pval for pcol, pval in partition_values.items()
+            ]
+            other_partition_df = other_df.filter(
+                reduce(
+                    lambda a, b: a & b,
+                    partition_matching_expressions[1:],
+                    partition_matching_expressions[0],
+                )
+            )
+            updated_partition_df = self.read_partition(
+                partition_values=partition_values
+            ).update(other_partition_df, on=on, how=how)
+            self.write(updated_partition_df)

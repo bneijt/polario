@@ -8,14 +8,26 @@ import pytest
 from polario.dataset import HiveDataset
 
 
+def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
+    """Assert two dataframes are equal"""
+    assert sorted(a.columns) == sorted(b.columns), "Should have the same columns"
+    assert a.schema == b.schema, "Should have the same schema"
+    column_order = list(sorted(a.columns))
+
+    def comparable_repr(df: pl.DataFrame) -> dict:
+        return df.select(column_order).sort(column_order).to_dict(as_series=False)
+
+    assert comparable_repr(a) == comparable_repr(b), reason
+
+
 @pytest.fixture
 def example_df_1() -> pl.DataFrame:
     return pl.from_dicts(
         [
-            {"p1": 1, "p2": "a", "v": 1},
-            {"p1": 1, "p2": "b", "v": 1},
-            {"p1": 2, "p2": "a", "v": 1},
-            {"p1": 2, "p2": "a", "v": 1},
+            {"p1": "1", "p2": "a", "v": 1},
+            {"p1": "1", "p2": "b", "v": 1},
+            {"p1": "2", "p2": "a", "v": 1},
+            {"p1": "2", "p2": "a", "v": 2},
         ]
     )
 
@@ -31,6 +43,13 @@ def example_ds_1(example_df_1: pl.DataFrame) -> Iterable[HiveDataset]:
 def test_dataset_should_raise_for_unsupported_protocol() -> None:
     with pytest.raises(ValueError):
         HiveDataset("example://some/url")
+
+
+def test_write_should_raise_for_non_string_partition_columns(
+    example_ds_1: HiveDataset,
+) -> None:
+    with pytest.raises(ValueError):
+        example_ds_1.write(pl.from_dicts([{"p1": 1, "p2": "a", "v": 1}]))
 
 
 def test_write_partitioned_data(example_df_1: pl.DataFrame) -> None:
@@ -90,3 +109,63 @@ def test_read_partion_should_read_single_partition(example_ds_1: HiveDataset) ->
         2,
         3,
     ), "This partition should contain two rows and all columns"
+
+
+def test_update_should_fail_if_partition_columns_are_not_string(
+    example_ds_1: HiveDataset,
+) -> None:
+    with pytest.raises(ValueError, match="columns must be of type string"):
+        example_ds_1.update(
+            pl.from_dicts(
+                [
+                    {"p1": 1, "p2": "a", "v": 1},
+                ]
+            ),
+            on=["p2"],
+        )
+
+
+def test_update() -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = HiveDataset(tempdir, partition_columns=["p1", "p2"], max_rows_per_file=1)
+        ds.write(
+            pl.from_dicts(
+                [
+                    {"p1": "1", "p2": "a", "v": 1},
+                    {"p1": "1", "p2": "b", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 2},
+                ]
+            )
+        )
+
+        before_updates = ds.read()
+        ds.update(before_updates, on=before_updates.columns)
+
+        assert_equal(
+            before_updates,
+            ds.read(),
+            "Update with itself should not change anything",
+        )
+
+        new_row = pl.from_dicts([{"p1": "1", "p2": "a", "v": 4}])
+        ds.update(new_row, on=before_updates.columns)
+        assert_equal(
+            ds.read(),
+            before_updates,
+            "Should not have updated anything, because there is no match on all columns",
+        )
+
+        ds.update(new_row, on=["p1", "p2"])
+        assert_equal(
+            ds.read(),
+            pl.from_dicts(
+                [
+                    {"p1": "1", "p2": "a", "v": 4},
+                    {"p1": "1", "p2": "b", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 2},
+                ]
+            ),
+            "Should have updated the value of the first row",
+        )
