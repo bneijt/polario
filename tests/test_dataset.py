@@ -9,7 +9,9 @@ from polario.dataset import HiveDataset
 
 
 def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
+    """Assert two dataframes are equal"""
     assert sorted(a.columns) == sorted(b.columns), "Should have the same columns"
+    assert a.schema == b.schema, "Should have the same schema"
     column_order = list(sorted(a.columns))
 
     def comparable_repr(df: pl.DataFrame) -> dict:
@@ -22,10 +24,10 @@ def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
 def example_df_1() -> pl.DataFrame:
     return pl.from_dicts(
         [
-            {"p1": 1, "p2": "a", "v": 1},
-            {"p1": 1, "p2": "b", "v": 1},
-            {"p1": 2, "p2": "a", "v": 1},
-            {"p1": 2, "p2": "a", "v": 2},
+            {"p1": "1", "p2": "a", "v": 1},
+            {"p1": "1", "p2": "b", "v": 1},
+            {"p1": "2", "p2": "a", "v": 1},
+            {"p1": "2", "p2": "a", "v": 2},
         ]
     )
 
@@ -41,6 +43,13 @@ def example_ds_1(example_df_1: pl.DataFrame) -> Iterable[HiveDataset]:
 def test_dataset_should_raise_for_unsupported_protocol() -> None:
     with pytest.raises(ValueError):
         HiveDataset("example://some/url")
+
+
+def test_write_should_raise_for_non_string_partition_columns(
+    example_ds_1: HiveDataset,
+) -> None:
+    with pytest.raises(ValueError):
+        example_ds_1.write(pl.from_dicts([{"p1": 1, "p2": "a", "v": 1}]))
 
 
 def test_write_partitioned_data(example_df_1: pl.DataFrame) -> None:

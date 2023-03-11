@@ -68,6 +68,18 @@ class HiveDataset:
         dataframe: pl.DataFrame,
         existing_data_behavior: ExistingDataBehavior = ExistingDataBehavior.DELETE_MATCHING,
     ) -> None:
+        """Write the given dataframe to the dataset
+
+        The default behavior expects you to write dataframes with full partitions.
+
+        Args:
+            dataframe (pl.DataFrame): DataFrame to write to this dataset
+            existing_data_behavior (ExistingDataBehavior, optional): What to do when a partition from the dataframe already exists. Defaults to ExistingDataBehavior.DELETE_MATCHING.
+
+        Raises:
+            ValueError: When the partition columns are not strings, see `HiveDataset.assert_partition_columns_are_string`
+        """
+        self.assert_partition_columns_are_string(dataframe)
         table = dataframe.to_arrow()
 
         if self.partition_columns:
@@ -122,6 +134,8 @@ class HiveDataset:
 
         Returns:
             pl.DataFrame: The read dataframe
+        Raises:
+            ValueError: When a value for a partition column is missing
         """
         partition_location = self.partition_location(partition_values=partition_values)
         fs = fsspec.filesystem(self.location.scheme)
@@ -148,6 +162,8 @@ class HiveDataset:
 
         Returns:
             str: Location of the hive partition
+        Raises:
+            ValueError: When a value for a partition column is missing
         """
         if not set(self.partition_columns) == partition_values.keys():
             raise ValueError(
