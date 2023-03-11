@@ -3,6 +3,7 @@ from enum import Enum
 from functools import reduce
 from typing import Iterable, Optional, Sequence
 from urllib.parse import urlsplit, urlunsplit
+from uuid import uuid4
 
 import fsspec
 import polars as pl
@@ -63,23 +64,7 @@ class HiveDataset:
         """Read the whole dataset into a dataframe"""
         return self.scan().collect()
 
-    def write(
-        self,
-        dataframe: pl.DataFrame,
-        existing_data_behavior: ExistingDataBehavior = ExistingDataBehavior.DELETE_MATCHING,
-    ) -> None:
-        """Write the given dataframe to the dataset
-
-        The default behavior expects you to write dataframes with full partitions.
-
-        Args:
-            dataframe (pl.DataFrame): DataFrame to write to this dataset
-            existing_data_behavior (ExistingDataBehavior, optional): What to do when a partition from the dataframe already exists. Defaults to ExistingDataBehavior.DELETE_MATCHING.
-
-        Raises:
-            ValueError: When the partition columns are not strings, see `HiveDataset.assert_partition_columns_are_string`
-        """
-        self.assert_partition_columns_are_string(dataframe)
+    def to_compatible_arrow_table(self, dataframe: pl.DataFrame) -> pa.Table:
         table = dataframe.to_arrow()
 
         if self.partition_columns:
@@ -98,6 +83,26 @@ class HiveDataset:
                     ]
                 )
             )
+        return table
+
+    def write(
+        self,
+        data_frame: pl.DataFrame,
+        existing_data_behavior: ExistingDataBehavior = ExistingDataBehavior.DELETE_MATCHING,
+    ) -> None:
+        """Write the given dataframe to the dataset
+
+        The default behavior expects you to write dataframes with full partitions.
+
+        Args:
+            dataframe (pl.DataFrame): DataFrame to write to this dataset
+            existing_data_behavior (ExistingDataBehavior, optional): What to do when a partition from the dataframe already exists. Defaults to ExistingDataBehavior.DELETE_MATCHING.
+
+        Raises:
+            ValueError: When the partition columns are not strings, see `HiveDataset.assert_partition_columns_are_string`
+        """
+        self.assert_partition_columns_are_string(data_frame)
+        table = self.to_compatible_arrow_table(data_frame)
         pyarrow.dataset.write_dataset(
             table,
             self.location.geturl(),
@@ -238,3 +243,23 @@ class HiveDataset:
                     f"Unable to update partition that is not in the dataset. other_df contains {partition_values}",
                     e,
                 )
+
+    def append(self, data_frame: pl.DataFrame) -> None:
+        """Append the given data frame to the dataset
+
+        Args:
+            data_frame (pl.DataFrame): Data frame to add to the dataset
+        """
+        self.assert_partition_columns_are_string(data_frame)
+        table = self.to_compatible_arrow_table(data_frame)
+        pyarrow.dataset.write_dataset(
+            table,
+            self.location.geturl(),
+            format="parquet",
+            partitioning=self.partition_columns,
+            partitioning_flavor="hive",
+            existing_data_behavior=ExistingDataBehavior.OVERWRITE_OR_IGNORE.value,
+            max_rows_per_group=self.max_rows_per_file,
+            max_rows_per_file=self.max_rows_per_file,
+            basename_template=uuid4().hex + "_{i}.parquet",
+        )
