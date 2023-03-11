@@ -64,13 +64,25 @@ class HiveDataset:
         """Read the whole dataset into a dataframe"""
         return self.scan().collect()
 
-    def to_compatible_arrow_table(self, dataframe: pl.DataFrame) -> pa.Table:
-        table = dataframe.to_arrow()
+    def to_compatible_arrow_table(self, data_frame: pl.DataFrame) -> pa.Table:
+        """Transforms the given data frame into a `pyarrow.Table` that has
+        compatible columns that allow the partition columns to be written to a filesystem.
+
+        Args:
+            data_frame (pl.DataFrame): The data frame to load
+
+        Raises:
+            ValueError: If the data frame contains no non-partition columns
+
+        Returns:
+            pa.Table: A table with the partition columns cast to simple strings
+        """
+        table = data_frame.to_arrow()
 
         if self.partition_columns:
-            if len(self.partition_columns) >= len(dataframe.columns):
+            if len(self.partition_columns) >= len(data_frame.columns):
                 raise ValueError(
-                    f"Can not have all columns as partition columns, got '{self.partition_columns}' as partition columns and a dataframe with '{dataframe.columns}'."
+                    f"Can not have all columns as partition columns, got '{self.partition_columns}' as partition columns and a dataframe with '{data_frame.columns}'."
                 )
             # Cast all partition columns to string values
             table = table.cast(
