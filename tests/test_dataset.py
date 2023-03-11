@@ -125,6 +125,25 @@ def test_update_should_fail_if_partition_columns_are_not_string(
         )
 
 
+def test_read_partition_should_raise_if_not_found(example_ds_1: HiveDataset) -> None:
+    with pytest.raises(FileNotFoundError, match="not_there"):
+        example_ds_1.read_partition({"p1": "not_there", "p2": "a"})
+
+
+def test_update_on_non_existing_partition_should_raise(
+    example_ds_1: HiveDataset,
+) -> None:
+    with pytest.raises(ValueError, match="not_there"):
+        example_ds_1.update(
+            pl.from_dicts(
+                [
+                    {"p1": "not_there", "p2": "a", "v": 1},
+                ]
+            ),
+            on=["p1"],
+        )
+
+
 def test_update() -> None:
     with tempfile.TemporaryDirectory() as tempdir:
         ds = HiveDataset(tempdir, partition_columns=["p1", "p2"], max_rows_per_file=1)

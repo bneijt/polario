@@ -136,6 +136,7 @@ class HiveDataset:
             pl.DataFrame: The read dataframe
         Raises:
             ValueError: When a value for a partition column is missing
+            FileNotFoundError: When the requested partition does not exist
         """
         partition_location = self.partition_location(partition_values=partition_values)
         fs = fsspec.filesystem(self.location.scheme)
@@ -210,7 +211,8 @@ class HiveDataset:
             upsert_df (pl.Dataframe): Dataframe to upsert into the dataset
             on (pl.Dataframe): Dataframe to upsert into the dataset
         Raises:
-            ValueError: When the partition columns are not of type `polars.Utf8`.
+            ValueError: When the partition columns are not of type `polars.Utf8`
+            ValueError: When you try to update a partition that is not in the dataset
         """
         self.assert_partition_columns_are_string(other_df)
         partitions = other_df.select(self.partition_columns).unique()
@@ -226,7 +228,13 @@ class HiveDataset:
                     partition_matching_expressions[0],
                 )
             )
-            updated_partition_df = self.read_partition(
-                partition_values=partition_values
-            ).update(other_partition_df, on=on, how=how)
-            self.write(updated_partition_df)
+            try:
+                updated_partition_df = self.read_partition(
+                    partition_values=partition_values
+                ).update(other_partition_df, on=on, how=how)
+                self.write(updated_partition_df)
+            except FileNotFoundError as e:
+                raise ValueError(
+                    f"Unable to update partition that is not in the dataset. other_df contains {partition_values}",
+                    e,
+                )
