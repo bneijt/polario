@@ -161,6 +161,27 @@ class HiveDataset:
         )
         return urlunsplit(ploc)
 
+    def assert_partition_columns_are_string(self, df: pl.DataFrame) -> None:
+        """Raise a value error if any of the partition columns are not `polars.Utf8`
+
+        This is important, because the partition column values are only stored on the filesystem
+        as directory names, this means they will always be cast to string and read back as string again.
+
+        Args:
+            df (pl.DataFrame): Dataframe to check
+        Raises:
+            ValueError: When the partition columns are not of type `polars.Utf8`.
+        """
+        wrong_columns = [
+            (col_name, col_type)
+            for col_name, col_type in df.schema.items()
+            if col_name in self.partition_columns and col_type != pl.Utf8
+        ]
+        if wrong_columns:
+            raise ValueError(
+                f"Partition columns must be of type string for dataset. Wrong columns are {wrong_columns}"
+            )
+
     def update(
         self, other_df: pl.DataFrame, on: Sequence[str], how: str = "left"
     ) -> None:
@@ -173,6 +194,7 @@ class HiveDataset:
             upsert_df (pl.Dataframe): Dataframe to upsert into the dataset
             on (pl.Dataframe): Dataframe to upsert into the dataset
         """
+        self.assert_partition_columns_are_string(other_df)
         partitions = other_df.select(self.partition_columns).unique()
         for partition_values in partitions.to_dicts():
             partition_filter = [

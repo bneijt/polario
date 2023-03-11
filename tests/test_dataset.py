@@ -9,8 +9,13 @@ from polario.dataset import HiveDataset
 
 
 def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
-    assert a.columns == b.columns, f"Colums should match: {reason}"
-    assert a.to_dict(as_series=False) == b.to_dict(as_series=False), reason
+    assert sorted(a.columns) == sorted(b.columns), "Should have the same columns"
+    column_order = list(sorted(a.columns))
+
+    def comparable_repr(df: pl.DataFrame) -> dict:
+        return df.select(column_order).sort(column_order).to_dict(as_series=False)
+
+    assert comparable_repr(a) == comparable_repr(b), reason
 
 
 @pytest.fixture
@@ -97,27 +102,65 @@ def test_read_partion_should_read_single_partition(example_ds_1: HiveDataset) ->
     ), "This partition should contain two rows and all columns"
 
 
-def test_update(example_df_1: pl.DataFrame) -> None:
+def test_update_should_fail_if_partition_columns_are_not_string(
+    example_ds_1: HiveDataset,
+) -> None:
+    with pytest.raises(ValueError, match="columns must be of type string"):
+        example_ds_1.update(
+            pl.from_dicts(
+                [
+                    {"p1": 1, "p2": "a", "v": 1},
+                ]
+            ),
+            on=["p2"],
+        )
+
+
+def test_update() -> None:
     with tempfile.TemporaryDirectory() as tempdir:
         ds = HiveDataset(tempdir, partition_columns=["p1", "p2"], max_rows_per_file=1)
-        ds.write(example_df_1)
+        ds.write(
+            pl.from_dicts(
+                [
+                    {"p1": "1", "p2": "a", "v": 1},
+                    {"p1": "1", "p2": "b", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 2},
+                ]
+            )
+        )
 
-        before_update = ds.read()
-        ds.update(example_df_1, on=example_df_1.columns)
+        before_updates = ds.read()
+        ds.update(before_updates, on=before_updates.columns)
+
         assert_equal(
-            before_update, ds.read()
-        ), "Update with itself should not have changed anything"
+            before_updates,
+            ds.read(),
+            "Update with itself should not change anything",
+        )
 
         new_row = pl.from_dicts(
             [
-                {"p1": 1, "p2": "a", "v": 4},
+                {"p1": "1", "p2": "a", "v": 4},
             ]
         )
-        ds.update(new_row, on=example_df_1.columns)
+        ds.update(new_row, on=before_updates.columns)
         assert_equal(
             ds.read(),
-            example_df_1,
-            "Should not have updated anything, because there is no match",
+            before_updates,
+            "Should not have updated anything, because there is no match on all columns",
         )
 
-        # updated_d.read().to_dicts() == example_df_1.to_dicts() + new_row.to_dicts(), "Should have added a new unique row"
+        ds.update(new_row, on=["p1", "p2"])
+        assert_equal(
+            ds.read(),
+            pl.from_dicts(
+                [
+                    {"p1": "1", "p2": "a", "v": 4},
+                    {"p1": "1", "p2": "b", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 1},
+                    {"p1": "2", "p2": "a", "v": 2},
+                ]
+            ),
+            "Should have updated the value of the first row",
+        )
