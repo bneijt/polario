@@ -209,15 +209,22 @@ class HiveDataset:
         Args:
             upsert_df (pl.Dataframe): Dataframe to upsert into the dataset
             on (pl.Dataframe): Dataframe to upsert into the dataset
+        Raises:
+            ValueError: When the partition columns are not of type `polars.Utf8`.
         """
         self.assert_partition_columns_are_string(other_df)
         partitions = other_df.select(self.partition_columns).unique()
         for partition_values in partitions.to_dicts():
-            partition_filter = [
+            # Filter other_df on partition values for the partition we are about to update
+            partition_matching_expressions = [
                 pl.col(pcol) == pval for pcol, pval in partition_values.items()
             ]
             other_partition_df = other_df.filter(
-                reduce(lambda a, b: a & b, partition_filter[1:], partition_filter[0])
+                reduce(
+                    lambda a, b: a & b,
+                    partition_matching_expressions[1:],
+                    partition_matching_expressions[0],
+                )
             )
             updated_partition_df = self.read_partition(
                 partition_values=partition_values
