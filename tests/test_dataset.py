@@ -188,3 +188,16 @@ def test_update() -> None:
             ),
             "Should have updated the value of the first row",
         )
+
+
+def test_append_should_add_data(
+    example_ds_1: HiveDataset, example_df_1: pl.DataFrame
+) -> None:
+    for i in range(10):
+        example_ds_1.append(example_df_1)
+    assert (
+        example_ds_1.read().shape[1] == example_df_1.shape[1]
+    ), "Same number of columns"
+    assert (
+        example_ds_1.read().shape[0] == example_df_1.shape[0] * 11
+    ), "Added ten times the original df in rows"
