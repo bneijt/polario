@@ -148,11 +148,7 @@ def test_update() -> None:
             "Update with itself should not change anything",
         )
 
-        new_row = pl.from_dicts(
-            [
-                {"p1": "1", "p2": "a", "v": 4},
-            ]
-        )
+        new_row = pl.from_dicts([{"p1": "1", "p2": "a", "v": 4}])
         ds.update(new_row, on=before_updates.columns)
         assert_equal(
             ds.read(),
