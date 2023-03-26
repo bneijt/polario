@@ -33,6 +33,9 @@ pre-commit = "^3.1.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry.scripts]
+polario = 'polario.main:main'
+
 [tool.isort]
 profile = "black"
 
