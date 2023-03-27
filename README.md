@@ -3,6 +3,8 @@ Polars IO utility library
 
 Helpers to make it easier to read and write Hive partitioned parquet dataset with Polars.
 
+It is meant to be a library to deal with datasets easily, but also contains a commandline interface
+which allows you to inspect parquet files and datasets more easily.
 
 Dataset
 =======

@@ -26,12 +26,15 @@ pytest = "^7.2.1"
 pdoc = "^13.0.0"
 twine = "^4.0.2"
 isort = "^5.12.0"
-flake8 = "^6.0.0"
 pre-commit = "^3.1.0"
+ruff = "^0.0.259"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+polario = 'polario.main:main'
 
 [tool.isort]
 profile = "black"
@@ -40,3 +43,6 @@ profile = "black"
 files = "polario,tests"
 ignore_missing_imports = true
 show_error_codes = true
+
+[tool.ruff]
+extend-ignore = ["E501"]
