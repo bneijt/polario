@@ -5,6 +5,7 @@ import json
 import sys
 from enum import Enum
 from pathlib import Path
+from pprint import pprint
 
 import polars as pl
 
@@ -15,12 +16,13 @@ class Command(Enum):
     SHOW = "show"
     SCHEMA = "schema"
     JSON_HEAD = "json_head"
+    JSONL = "jsonl"
 
 
 def main() -> int:
     """Main CLI interface"""
     parser = argparse.ArgumentParser(
-        description="Polario: A Python package for polarimetric data analysis"
+        description="polario library commandline tool to inspect Parquet files"
     )
     parser.add_argument(
         "--version",
@@ -33,7 +35,11 @@ def main() -> int:
         help="command to run",
     )
     parser.add_argument(
-        "paths", metavar="PATH", type=Path, nargs="+", help="input paths"
+        "paths",
+        metavar="PATH",
+        type=Path,
+        nargs="+",
+        help="input paths",
     )
     args = parser.parse_args()
     cmd = Command(args.cmd)
@@ -46,9 +52,13 @@ def main() -> int:
         if cmd == Command.SHOW:
             print(df)
         elif cmd == Command.SCHEMA:
-            print(df.schema())
+            pprint(df.schema)
         elif cmd == Command.JSON_HEAD:
             json.dump(df.head().to_dicts(), sys.stdout, indent=2)
+        elif cmd == Command.JSONL:
+            for row in df.to_dicts():
+                json.dump(row, sys.stdout, separators=(",", ":"))
+                sys.stdout.write("\n")
     return 0
 
 
