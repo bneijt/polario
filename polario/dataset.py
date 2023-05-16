@@ -1,7 +1,7 @@
 """The main dataset package"""
 from enum import Enum
 from functools import reduce
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Literal, Optional, Sequence
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
@@ -217,7 +217,10 @@ class HiveDataset:
             )
 
     def update(
-        self, other_df: pl.DataFrame, on: Sequence[str], how: str = "left"
+        self,
+        other_df: pl.DataFrame,
+        on: Sequence[str],
+        how: Literal["left", "inner"] = "left",
     ) -> None:
         """Upsert the given dataframe into the dataset.
 
