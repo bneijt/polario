@@ -1,10 +1,12 @@
 import os
 import tempfile
-from typing import Iterable
+from typing import Type, Union
 
 import polars as pl
 import pytest
 
+from polario import unwrap
+from polario.delta_dataset import DeltaDataset
 from polario.hive_dataset import HiveDataset
 
 
@@ -32,172 +34,107 @@ def example_df_1() -> pl.DataFrame:
     )
 
 
-@pytest.fixture
-def example_ds_1(example_df_1: pl.DataFrame) -> Iterable[HiveDataset]:
+@pytest.mark.parametrize("Dataset", [HiveDataset, DeltaDataset])
+def test_read_back_data(
+    Dataset: Union[Type[HiveDataset], Type[DeltaDataset]], example_df_1: pl.DataFrame
+) -> None:
     with tempfile.TemporaryDirectory() as tempdir:
-        ds = HiveDataset(tempdir, partition_columns=["p1", "p2"], max_rows_per_file=1)
+        ds = Dataset(tempdir)
         ds.write(example_df_1)
-        yield ds
-
-
-def test_dataset_should_raise_for_unsupported_protocol() -> None:
-    with pytest.raises(ValueError):
-        HiveDataset("example://some/url")
-
-
-def test_write_should_raise_for_non_string_partition_columns(
-    example_ds_1: HiveDataset,
-) -> None:
-    with pytest.raises(ValueError):
-        example_ds_1.write(pl.from_dicts([{"p1": 1, "p2": "a", "v": 1}]))
-
-
-def test_write_partitioned_data(example_df_1: pl.DataFrame) -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        HiveDataset(tempdir).write(example_df_1)
-        assert "part-0.parquet" in os.listdir(
-            tempdir
-        ), "Should write out one top-level part-0.parquet"
-
-    with tempfile.TemporaryDirectory() as tempdir:
-        HiveDataset(tempdir, partition_columns=["p1"]).write(example_df_1)
-        assert "p1=1" in os.listdir(tempdir), "Should partition with p1"
-
-    with tempfile.TemporaryDirectory() as tempdir:
-        HiveDataset(tempdir, partition_columns=["p1", "p2"]).write(example_df_1)
-        assert "p1=1" in os.listdir(tempdir), "Should partition with a first"
-        assert "p2=a" in os.listdir(f"{tempdir}/p1=1"), "Should partition with b second"
-
-
-def test_read_partitions(example_ds_1: HiveDataset, example_df_1: pl.DataFrame) -> None:
-    partitions = list(example_ds_1.read_partitions())
-    assert (
-        len(partitions) == 3
-    ), "Three different combinations of a and b columns values"
-    assert [p.shape for p in partitions] == [
-        (1, 3),
-        (1, 3),
-        (2, 3),
-    ], "Should have read the right shapes"
-    assert (
-        pl.concat(partitions).to_dicts()
-        == example_df_1.with_columns([pl.col("p1").cast(pl.Utf8)]).to_dicts()
-    ), "Partition columns are read back as Utf8"
-
-
-def test_partion_columns_should_be_string(example_ds_1: HiveDataset) -> None:
-    df = example_ds_1.read()
-    assert df.schema == {"v": pl.Int64, "p1": pl.Utf8, "p2": pl.Utf8}
-    assert df.shape == (4, 3)
-
-
-def test_read_partion_should_read_single_partition(example_ds_1: HiveDataset) -> None:
-    with pytest.raises(ValueError):
-        # Missing p2
-        example_ds_1.read_partition({"p1": "1"})
-    with pytest.raises(FileNotFoundError):
-        # Missing p2
-        example_ds_1.read_partition({"p1": "not_there", "p2": "not_there"})
-
-    partition_df = example_ds_1.read_partition({"p1": "1", "p2": "a"})
-    assert partition_df.shape == (
-        1,
-        3,
-    ), "This partition should contain only a single row and all columns"
-    partition_df = example_ds_1.read_partition({"p1": "2", "p2": "a"})
-    assert partition_df.shape == (
-        2,
-        3,
-    ), "This partition should contain two rows and all columns"
-
-
-def test_update_should_fail_if_partition_columns_are_not_string(
-    example_ds_1: HiveDataset,
-) -> None:
-    with pytest.raises(ValueError, match="columns must be of type string"):
-        example_ds_1.update(
-            pl.from_dicts(
-                [
-                    {"p1": 1, "p2": "a", "v": 1},
-                ]
-            ),
-            on=["p2"],
-        )
-
-
-def test_read_partition_should_raise_if_not_found(example_ds_1: HiveDataset) -> None:
-    with pytest.raises(FileNotFoundError, match="not_there"):
-        example_ds_1.read_partition({"p1": "not_there", "p2": "a"})
-
-
-def test_update_on_non_existing_partition_should_raise(
-    example_ds_1: HiveDataset,
-) -> None:
-    with pytest.raises(ValueError, match="not_there"):
-        example_ds_1.update(
-            pl.from_dicts(
-                [
-                    {"p1": "not_there", "p2": "a", "v": 1},
-                ]
-            ),
-            on=["p1"],
-        )
-
-
-def test_update() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        ds = HiveDataset(tempdir, partition_columns=["p1", "p2"], max_rows_per_file=1)
-        ds.write(
-            pl.from_dicts(
-                [
-                    {"p1": "1", "p2": "a", "v": 1},
-                    {"p1": "1", "p2": "b", "v": 1},
-                    {"p1": "2", "p2": "a", "v": 1},
-                    {"p1": "2", "p2": "a", "v": 2},
-                ]
-            )
-        )
-
-        before_updates = ds.read()
-        ds.update(before_updates, on=before_updates.columns)
-
+        assert len(os.listdir(tempdir)) >= 1, "Should write to disk"
         assert_equal(
-            before_updates,
-            ds.read(),
-            "Update with itself should not change anything",
+            unwrap(ds.scan()).collect(), example_df_1, "Should read back the same data"
         )
 
-        new_row = pl.from_dicts([{"p1": "1", "p2": "a", "v": 4}])
-        ds.update(new_row, on=before_updates.columns)
+    with tempfile.TemporaryDirectory() as tempdir:
+        # Writing twice should result in the same data
+        ds = Dataset(tempdir, partition_columns=["p1"])
+        ds.write(example_df_1)
+        ds.write(example_df_1)
         assert_equal(
-            ds.read(),
-            before_updates,
-            "Should not have updated anything, because there is no match on all columns",
+            unwrap(ds.scan()).collect(), example_df_1, "Should read back the same data"
         )
 
-        ds.update(new_row, on=["p1", "p2"])
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = Dataset(tempdir, partition_columns=["p1", "p2"])
+        ds.write(example_df_1)
         assert_equal(
-            ds.read(),
-            pl.from_dicts(
-                [
-                    {"p1": "1", "p2": "a", "v": 4},
-                    {"p1": "1", "p2": "b", "v": 1},
-                    {"p1": "2", "p2": "a", "v": 1},
-                    {"p1": "2", "p2": "a", "v": 2},
-                ]
-            ),
-            "Should have updated the value of the first row",
+            unwrap(ds.scan()).collect(), example_df_1, "Should read back the same data"
         )
 
 
+@pytest.mark.parametrize("Dataset", [HiveDataset, DeltaDataset])
+def test_write_only_partitions_is_not_allowed(
+    Dataset: Union[Type[HiveDataset], Type[DeltaDataset]]
+) -> None:
+    """Writing out dataframes that contain only partition columns is not allowed"""
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = Dataset(tempdir, partition_columns=["a"])
+        with pytest.raises(ValueError):
+            ds.write(pl.from_dicts([{"a": "1"}]))
+        with pytest.raises(ValueError):
+            ds.append(pl.from_dicts([{"a": "1"}]))
+
+
+@pytest.mark.parametrize("Dataset", [HiveDataset, DeltaDataset])
+def test_scan_and_read_return_optional(
+    Dataset: Union[Type[HiveDataset], Type[DeltaDataset]], example_df_1: pl.DataFrame
+) -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = Dataset(tempdir, partition_columns=["p1", "p2"])
+        assert ds.scan() is None, "Should return None if no data is present"
+
+
+@pytest.mark.parametrize("Dataset", [HiveDataset, DeltaDataset])
+def test_read_partion_should_read_single_partition(
+    Dataset: Union[Type[HiveDataset], Type[DeltaDataset]], example_df_1: pl.DataFrame
+) -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = Dataset(tempdir, partition_columns=["p1", "p2"])
+        ds.write(example_df_1)
+        with pytest.raises(
+            ValueError,
+        ):
+            # Missing p2
+            ds.read_partition({"p1": "1"})
+
+        partition_df = unwrap(ds.read_partition({"p1": "1", "p2": "a"}))
+        assert partition_df.shape == (
+            1,
+            3,
+        ), "This partition should contain only a single row and all columns"
+        partition_df = unwrap(ds.read_partition({"p1": "2", "p2": "a"}))
+        assert partition_df.shape == (
+            2,
+            3,
+        ), "This partition should contain two rows and all columns"
+
+
+@pytest.mark.parametrize("Dataset", [HiveDataset])
+def test_write_back_a_partition(
+    Dataset: Type[HiveDataset], example_df_1: pl.DataFrame
+) -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = Dataset(tempdir, partition_columns=["p1"])
+        ds.write(example_df_1)
+        for partition in ds.read_partitions():
+            ds.write(partition)
+        assert_equal(
+            unwrap(ds.scan()).collect(), example_df_1, "Should read back the same data"
+        )
+
+
+@pytest.mark.parametrize("Dataset", [HiveDataset, DeltaDataset])
 def test_append_should_add_data(
-    example_ds_1: HiveDataset, example_df_1: pl.DataFrame
+    Dataset: Union[Type[HiveDataset], Type[DeltaDataset]], example_df_1: pl.DataFrame
 ) -> None:
-    for i in range(10):
-        example_ds_1.append(example_df_1)
-    assert (
-        example_ds_1.read().shape[1] == example_df_1.shape[1]
-    ), "Same number of columns"
-    assert (
-        example_ds_1.read().shape[0] == example_df_1.shape[0] * 11
-    ), "Added ten times the original df in rows"
+    with tempfile.TemporaryDirectory() as tempdir:
+        ds = Dataset(tempdir, partition_columns=["p1", "p2"])
+        for i in range(10):
+            ds.append(example_df_1)
+        assert (
+            unwrap(ds.scan()).collect().shape[1] == example_df_1.shape[1]
+        ), "Same number of columns"
+        assert (
+            unwrap(ds.scan()).collect().shape[0] == example_df_1.shape[0] * 10
+        ), "Added ten times the original df in rows"

@@ -14,10 +14,8 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.9"
-polars = ">=0.16.8"
-fsspec = "^2023.1.0"
-pyarrow = ">=11.0.0"
-
+polars = { extras = ["fsspec"], version = ">=0.18" }
+fsspec = "*"
 
 [tool.poetry.group.dev.dependencies]
 black = { version = "^23.1.0", allow-prereleases = true }
@@ -28,6 +26,8 @@ twine = "^4.0.2"
 isort = "^5.12.0"
 pre-commit = "^3.1.0"
 ruff = "^0.0.259"
+deltalake = "^0.10.0"
+s3fs = "^2023.6.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -45,4 +45,4 @@ ignore_missing_imports = true
 show_error_codes = true
 
 [tool.ruff]
-extend-ignore = ["E501"]
+ignore = ["E501"]
