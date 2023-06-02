@@ -28,3 +28,10 @@ for partition_df in ds.read_partitions():
     print(partition_df)
 
 ```
+
+
+To model data storage, we use three layers: dataset, partition, fragment.
+
+Each dataset is a lexical ordered set of partitions
+Each partition is a lexical ordered set of fragments
+Each fragment is a file on disk with rows in any order
