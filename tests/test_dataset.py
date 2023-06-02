@@ -5,7 +5,7 @@ from typing import Iterable
 import polars as pl
 import pytest
 
-from polario.dataset import HiveDataset
+from polario.hive_dataset import HiveDataset
 
 
 def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
