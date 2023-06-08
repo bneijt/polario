@@ -162,9 +162,10 @@ class HiveDataset:
             for fragment_location in fs.ls(partition_location, detail=False)
             if fragment_location.endswith(".parquet")
         ]
+        scheme_prefix = f"{self.location.scheme}://" if self.location.scheme else ""
         return pl.concat(
             [
-                pl.read_parquet(urlunsplit(self.location._replace(path=parquet_file)))
+                pl.read_parquet(f"{scheme_prefix}{parquet_file}")
                 for parquet_file in parquet_files
             ]
         ).with_columns(
