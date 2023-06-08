@@ -163,7 +163,10 @@ class HiveDataset:
             if fragment_location.endswith(".parquet")
         ]
         return pl.concat(
-            [pl.read_parquet(parquet_file) for parquet_file in parquet_files]
+            [
+                pl.read_parquet(urlunsplit(self.location._replace(path=parquet_file)))
+                for parquet_file in parquet_files
+            ]
         ).with_columns(
             [
                 pl.lit(parcol_value).alias(parcol_name)
