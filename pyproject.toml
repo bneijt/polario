@@ -14,7 +14,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.9"
-polars = { extras = ["fsspec"], version = ">=0.18" }
+polars = { extras = ["fsspec"], version = ">=0.16" }
 fsspec = "*"
 
 [tool.poetry.group.dev.dependencies]
