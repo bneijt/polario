@@ -146,21 +146,33 @@ class HivePartition:
     def read(self) -> Optional[pl.DataFrame]:
         """Concat the fragments in this partition into a single dataframe"""
         fragments = [f.read() for f in self.fragments()]
-        superset_schema: dict[str, pl.PolarsDataType] = reduce(
-            lambda a, b: a | dict(b.schema), fragments[1:], dict(fragments[0].schema)
-        )
+        if len(fragments) > 1:
+            # Merge schemas from different fragments into a superset schema
+            superset_schema: dict[str, pl.PolarsDataType] = reduce(
+                lambda a, b: a | dict(b.schema),
+                fragments[1:],
+                dict(fragments[0].schema),
+            )
 
-        def add_missing_columns(df: pl.DataFrame) -> pl.DataFrame:
-            missing_columns = superset_schema.keys() - set(df.columns)
-            if missing_columns:
-                return df
-            else:
-                return df
+            def add_missing_columns(df: pl.DataFrame) -> pl.DataFrame:
+                missing_columns = superset_schema.keys() - set(df.columns)
+                if missing_columns:
+                    return df.with_columns(
+                        [
+                            pl.lit(None, superset_schema[col]).alias(col)
+                            for col in missing_columns
+                        ]
+                    )
+                else:
+                    return df
 
-        complete_fragements = [
-            add_missing_columns(f).select(superset_schema.keys()) for f in fragments
-        ]
-        if fragments:
+            complete_fragements = [
+                add_missing_columns(f).select(superset_schema.keys()) for f in fragments
+            ]
+        else:
+            complete_fragements = fragments
+
+        if complete_fragements:
             return pl.concat(complete_fragements).with_columns(
                 map(
                     lambda part: pl.lit(part[1]).alias(part[0]),
