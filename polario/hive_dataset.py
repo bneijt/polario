@@ -205,10 +205,14 @@ class HivePartition:
             target_fragment.write(fragment_df)
             target_fragment = target_fragment.next_fragment()
 
-    def write(self, df: pl.DataFrame) -> None:
-        """Write the dataframe to this partition"""
+    def delete(self) -> None:
+        """Delete the partition"""
         if self.fs.exists(self.url):
             self.fs.delete(self.url, recursive=True)
+
+    def write(self, df: pl.DataFrame) -> None:
+        """Write the dataframe to this partition"""
+        self.delete()
         self.fs.mkdir(self.url)
         target_fragment = ParquetFragment.first_fragment(
             self.url, self._parquet_write_options
@@ -312,6 +316,20 @@ class HiveDataset:
             maximum_rows_per_fragment=self._max_rows_per_fragment,
             parquet_write_options=self._parquet_write_options,
         ).read()
+
+    def delete_partition(self, partition_column_values: dict[str, str]) -> None:
+        """Read the given partition from the dataset"""
+        if set(partition_column_values.keys()) != set(self.partition_columns):
+            raise ValueError(
+                f"Partition column value keys {partition_column_values} do not match partition columns {self.partition_columns}"
+            )
+        return HivePartition(
+            fs=self.fs,
+            dataset_url=self.url,
+            partition_column_values=OrderedDict(partition_column_values),
+            maximum_rows_per_fragment=self._max_rows_per_fragment,
+            parquet_write_options=self._parquet_write_options,
+        ).delete()
 
     def scan_partitions(self) -> Iterable[pl.LazyFrame]:
         """Iterate over partitions"""
