@@ -196,7 +196,9 @@ class HivePartition:
     def _write_to_fragments(
         self, df: pl.DataFrame, target_fragment: ParquetFragment
     ) -> None:
-        output_columns = list(sorted(df.columns - self.partition_column_values.keys()))
+        output_columns = list(
+            sorted(set(df.columns) - self.partition_column_values.keys())
+        )
         for fragment_df in df.select(output_columns).iter_slices(
             self.maximum_rows_per_fragment
         ):
