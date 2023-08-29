@@ -25,6 +25,14 @@ def to_relative_location_from(
     relative_location = location
     if location.startswith(possible_prefix):
         relative_location = relative_location[len(possible_prefix) :]
+
+    # If base location is not absolute, it might be somewhere in location
+    if not base_location.startswith("/"):
+        if base_location in relative_location:
+            relative_location = relative_location[
+                relative_location.find(base_location) :
+            ]
+
     relative_location = relative_location.lstrip("/")
     scheme_less_url = base_location[len(possible_prefix) :].lstrip("/")
     if relative_location.startswith(scheme_less_url):
@@ -105,7 +113,7 @@ class HivePartition:
         relative_path_elements = relative_path.split("/")
         if any(map(lambda x: "=" not in x, relative_path_elements)):
             raise ValueError(
-                f"One or more parition path elements is missing an equal sign while parsing '{relative_path}'"
+                f"One or more parition path elements is missing an equal sign while parsing '{relative_path}' from '{dataset_url}'"
             )
 
         return cls(

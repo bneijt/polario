@@ -1,5 +1,6 @@
 import os
 import tempfile
+from pathlib import Path
 from typing import Iterable
 
 import polars as pl
@@ -84,6 +85,23 @@ def test_read_partitions(example_ds_1: HiveDataset, example_df_1: pl.DataFrame) 
         pl.concat(partitions).to_dicts()
         == example_df_1.with_columns([pl.col("p1").cast(pl.Utf8)]).to_dicts()
     ), "Partition columns are read back as Utf8"
+
+
+def test_use_relative_dataset_url_should_work(example_df_1: pl.DataFrame) -> None:
+    with tempfile.TemporaryDirectory() as tempdir:
+        old_wd = Path.cwd()
+        try:
+            os.chdir(tempdir)
+            ds = HiveDataset(
+                "target/banana", partition_columns=["p1"], max_rows_per_fragment=1
+            )
+            ds.write(example_df_1)
+            ds = HiveDataset(
+                "target/banana", partition_columns=["p1"], max_rows_per_fragment=1
+            )
+            unwrap(ds.scan()).collect()
+        finally:
+            os.chdir(old_wd)
 
 
 def test_partion_columns_should_be_string(example_ds_1: HiveDataset) -> None:
@@ -171,3 +189,13 @@ def test__make_location_relative() -> None:
         to_relative_location_from("s3://", burl, "s3://another/place/a=1")
         == "another/place/a=1"
     ), "Strip prefix if possible"
+    assert (
+        to_relative_location_from(
+            "", "relative/to/wd", "/absolute/from/root/relative/to/wd/place/a=1"
+        )
+        == "place/a=1"
+    ), "If base location is relative and location absolute, find based location in absolute location"
+    assert (
+        to_relative_location_from("", "relative/to/wd", "/relative/to/wd/place/a=1")
+        == "place/a=1"
+    ), "If base location is relative and location absolute, find based location in absolute location"
