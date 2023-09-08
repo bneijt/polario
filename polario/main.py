@@ -48,12 +48,16 @@ def main() -> int:
 
     if cmd == Command.CONCAT_CSV:
         df = reduce(
-            lambda a, b: pl.concat([a, pl.read_csv(b)]),
+            lambda a, b: pl.concat([a, pl.read_csv(b, infer_schema_length=0)]),
             args.paths[1:],
-            pl.read_csv(args.paths[0]),
+            pl.read_csv(args.paths[0], infer_schema_length=0),
         )
         print(df)
-        df.write_parquet(args.paths[0].stem + ".parquet")
+        output_filename = Path(args.paths[0].stem + ".parquet")
+        if output_filename.exists():
+            raise ValueError(f"Output file {output_filename} already exists")
+        print("Writing to", output_filename)
+        df.write_parquet(output_filename)
         return 0
 
     for path in args.paths:
