@@ -19,6 +19,7 @@ class Command(Enum):
     JSON_HEAD = "json_head"
     JSONL = "jsonl"
     CONCAT_CSV = "concat_csv"
+    WRITE_CSV = "write_csv"
 
 
 def main() -> int:
@@ -59,8 +60,8 @@ def main() -> int:
         print("Writing to", output_filename)
         df.write_parquet(output_filename)
         return 0
-
-    for path in args.paths:
+    paths: list[Path] = args.paths
+    for path in paths:
         if path.is_dir():
             raise ValueError(
                 "Input path must be a file. File an issue if you want dataset support."
@@ -76,6 +77,12 @@ def main() -> int:
             for row in df.to_dicts():
                 json.dump(row, sys.stdout, separators=(",", ":"))
                 sys.stdout.write("\n")
+        elif cmd == Command.WRITE_CSV:
+            output_path = Path(path.name).with_suffix(".csv")
+            if output_path.exists():
+                print(f"Output file {output_path} already exists")
+                continue
+            df.write_csv(output_path)
     return 0
 
 
