@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from enum import Enum
+from functools import reduce
 from pathlib import Path
 from pprint import pprint
 
@@ -17,6 +18,7 @@ class Command(Enum):
     SCHEMA = "schema"
     JSON_HEAD = "json_head"
     JSONL = "jsonl"
+    CONCAT_CSV = "concat_csv"
 
 
 def main() -> int:
@@ -43,6 +45,17 @@ def main() -> int:
     )
     args = parser.parse_args()
     cmd = Command(args.cmd)
+
+    if cmd == Command.CONCAT_CSV:
+        df = reduce(
+            lambda a, b: pl.concat([a, pl.read_csv(b)]),
+            args.paths[1:],
+            pl.read_csv(args.paths[0]),
+        )
+        print(df)
+        df.write_parquet(args.paths[0].stem + ".parquet")
+        return 0
+
     for path in args.paths:
         if path.is_dir():
             raise ValueError(
