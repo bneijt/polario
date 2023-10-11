@@ -8,10 +8,10 @@ which allows you to inspect parquet files and datasets more easily.
 
 Dataset
 =======
-Example of use of `polario.dataset.HiveDataset`
+Example of use of `polario.hive_dataset.HiveDataset`
 ```python
 
-from polario.dataset import HiveDataset
+from polario.hive_dataset import HiveDataset
 import polars as pl
 df = pl.from_dicts(
         [
@@ -32,6 +32,6 @@ for partition_df in ds.read_partitions():
 
 To model data storage, we use three layers: dataset, partition, fragment.
 
-Each dataset is a lexical ordered set of partitions
-Each partition is a lexical ordered set of fragments
-Each fragment is a file on disk with rows in any order
+- Each dataset is a lexical ordered set of partitions
+- Each partition is a lexical ordered set of fragments
+- Each fragment is a file on disk with rows in any order
