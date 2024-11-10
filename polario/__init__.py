@@ -1,10 +1,10 @@
 """
 .. include:: ../README.md
 """
-from importlib.metadata import version
+
 from typing import Optional, TypeVar
 
-__version__ = version(__name__)
+from ._version import __version__ as __version__
 
 T = TypeVar("T")
 

@@ -14,21 +14,26 @@ jobs:
       POETRY_VIRTUALENVS_IN_PROJECT: true
     steps:
       - uses: actions/checkout@v3
+      - uses: google/osv-scanner/actions/scanner@main
+        with:
+          to-scan: uv.lock
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - run: pip install poetry==1.3.2
+      - uses: pre-commit/action@v3.0.1
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.1"
       - name: cache venv
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-      - run: poetry install
-      - name: static analysis
-        run: |
-          poetry run black --check polario tests
-          poetry run mypy
-      - name: test
-        run: |
-          poetry run pytest
-          poetry build
+          key: venv-${{ runner.os }}-${{ hashFiles('**/uv.lock') }}
+      - run: uv sync
+      - run: uv run pytest tests
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 2
