@@ -65,7 +65,7 @@ def test_read_back_data(
 
 @pytest.mark.parametrize("Dataset", [HiveDataset, DeltaDataset])
 def test_write_only_partitions_is_not_allowed(
-    Dataset: Union[Type[HiveDataset], Type[DeltaDataset]]
+    Dataset: Union[Type[HiveDataset], Type[DeltaDataset]],
 ) -> None:
     """Writing out dataframes that contain only partition columns is not allowed"""
     with tempfile.TemporaryDirectory() as tempdir:
@@ -130,7 +130,7 @@ def test_append_should_add_data(
 ) -> None:
     with tempfile.TemporaryDirectory() as tempdir:
         ds = Dataset(tempdir, partition_columns=["p1", "p2"])
-        for i in range(10):
+        for _i in range(10):
             ds.append(example_df_1)
         assert (
             unwrap(ds.scan()).collect().shape[1] == example_df_1.shape[1]

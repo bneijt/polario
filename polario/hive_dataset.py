@@ -1,8 +1,12 @@
 """The hive dataset implementation"""
+
+from __future__ import annotations
+
 from collections import OrderedDict
+from collections.abc import Iterable
 from functools import reduce
 from itertools import chain
-from typing import Iterable, Optional, Tuple, Type
+from typing import Optional, Tuple, Type
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -27,11 +31,8 @@ def to_relative_location_from(
         relative_location = relative_location[len(possible_prefix) :]
 
     # If base location is not absolute, it might be somewhere in location
-    if not base_location.startswith("/"):
-        if base_location in relative_location:
-            relative_location = relative_location[
-                relative_location.find(base_location) :
-            ]
+    if not base_location.startswith("/") and base_location in relative_location:
+        relative_location = relative_location[relative_location.find(base_location) :]
 
     relative_location = relative_location.lstrip("/")
     scheme_less_url = base_location[len(possible_prefix) :].lstrip("/")
@@ -43,16 +44,16 @@ def to_relative_location_from(
 class ParquetFragment:
     """Pointer to a parquet fragment"""
 
-    def __init__(self, url: str, parquet_write_options: dict):
+    def __init__(self, url: str, parquet_write_options: dict) -> None:
         self.url = url
         self.parquet_write_options = parquet_write_options
 
     @classmethod
     def first_fragment(
-        cls: Type["ParquetFragment"],
+        cls: Type[ParquetFragment],
         partition_base_url: str,
         parquet_write_options: dict,
-    ) -> "ParquetFragment":
+    ) -> ParquetFragment:
         """Return a fragment name for what should be the first fragment in the partition"""
         idx = 0
         return cls(
@@ -60,7 +61,7 @@ class ParquetFragment:
             parquet_write_options,
         )
 
-    def next_fragment(self) -> "ParquetFragment":
+    def next_fragment(self) -> ParquetFragment:
         """Return a fragment name for what should be the next fragment in the partition"""
         idx = int(self.url.split("/")[-1].split("_")[0]) + 1
         return ParquetFragment(
@@ -102,13 +103,13 @@ class HivePartition:
 
     @classmethod
     def from_relative_path(
-        cls: Type["HivePartition"],
+        cls: Type[HivePartition],
         fs: AbstractFileSystem,
         dataset_url: str,
         relative_path: str,
         maximum_rows_per_fragment: int,
         parquet_write_options: dict,
-    ) -> "HivePartition":
+    ) -> HivePartition:
         """Create a partition from a relative path"""
         relative_path_elements = relative_path.split("/")
         if any(map(lambda x: "=" not in x, relative_path_elements)):
@@ -249,7 +250,7 @@ class HiveDataset:
     def __init__(
         self,
         url: str,
-        partition_columns: list[str] = [],
+        partition_columns: list[str] | None = None,
         max_rows_per_fragment: int = DEFAULT_ROWS_PER_FRAGMENT,
         parquet_write_options: dict = DEFAULT_PARQUET_WRITE_OPTIONS,
     ) -> None:
@@ -258,7 +259,7 @@ class HiveDataset:
         location = urlsplit(url)
         self.fs = fsspec.filesystem(location.scheme)
         self.scheme_prefix = location.scheme + "://" if location.scheme else ""
-        self.partition_columns = partition_columns
+        self.partition_columns = partition_columns or []
         self._max_rows_per_fragment = max_rows_per_fragment
         self._parquet_write_options = parquet_write_options
 
@@ -373,32 +374,38 @@ class HiveDataset:
         """Split dataframe into partitions and partition dataframes"""
         self._check_partition_columns(df)
         if self.partition_columns == []:
-            yield df, HivePartition(
-                fs=self.fs,
-                dataset_url=self.url,
-                partition_column_values=OrderedDict(),
-                maximum_rows_per_fragment=self._max_rows_per_fragment,
-                parquet_write_options=self._parquet_write_options,
+            yield (
+                df,
+                HivePartition(
+                    fs=self.fs,
+                    dataset_url=self.url,
+                    partition_column_values=OrderedDict(),
+                    maximum_rows_per_fragment=self._max_rows_per_fragment,
+                    parquet_write_options=self._parquet_write_options,
+                ),
             )
         else:
             partition_values = df.select(self.partition_columns).unique().to_dicts()
             for partition_value in partition_values:
-                yield df.filter(
-                    reduce(
-                        lambda a, b: a & b,
-                        [pl.col(k) == v for k, v in partition_value.items()],
-                    )
-                ), HivePartition(
-                    fs=self.fs,
-                    dataset_url=self.url,
-                    partition_column_values=OrderedDict(
-                        [
-                            (pcol, partition_value[pcol])
-                            for pcol in self.partition_columns
-                        ]
+                yield (
+                    df.filter(
+                        reduce(
+                            lambda a, b: a & b,
+                            [pl.col(k) == v for k, v in partition_value.items()],
+                        )
                     ),
-                    maximum_rows_per_fragment=self._max_rows_per_fragment,
-                    parquet_write_options=self._parquet_write_options,
+                    HivePartition(
+                        fs=self.fs,
+                        dataset_url=self.url,
+                        partition_column_values=OrderedDict(
+                            [
+                                (pcol, partition_value[pcol])
+                                for pcol in self.partition_columns
+                            ]
+                        ),
+                        maximum_rows_per_fragment=self._max_rows_per_fragment,
+                        parquet_write_options=self._parquet_write_options,
+                    ),
                 )
 
     def write(self, df: pl.DataFrame) -> None:

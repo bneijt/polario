@@ -1,7 +1,7 @@
 import os
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import polars as pl
 import pytest
@@ -129,13 +129,13 @@ def test_read_partion_should_read_single_partition(example_ds_1: HiveDataset) ->
 
 
 def test_read_partition_should_raise_if_not_found(example_ds_1: HiveDataset) -> None:
-    example_ds_1.read_partition({"p1": "not_there", "p2": "a"}) is None
+    assert example_ds_1.read_partition({"p1": "not_there", "p2": "a"}) is None
 
 
 def test_append_should_add_data(
     example_ds_1: HiveDataset, example_df_1: pl.DataFrame
 ) -> None:
-    for i in range(10):
+    for _i in range(10):
         example_ds_1.append(example_df_1)
     assert (
         unwrap(example_ds_1.scan()).collect().shape[1] == example_df_1.shape[1]

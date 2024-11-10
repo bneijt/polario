@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Literal, Optional
 from urllib.parse import urlsplit
 
@@ -8,12 +10,12 @@ import polars as pl
 class DeltaDataset:
     """Dataset based on deltatable storage"""
 
-    def __init__(self, url: str, partition_columns: list[str] = []):
+    def __init__(self, url: str, partition_columns: list[str] | None = None) -> None:
         self.url = url.rstrip("/")
         # Load fsspec filesystem from url scheme
         location = urlsplit(url)
         self.fs = fsspec.filesystem(location.scheme)
-        self.partition_columns = partition_columns
+        self.partition_columns = partition_columns or []
 
     def append(self, df: pl.DataFrame) -> None:
         self._write_delta(df, mode="append")
