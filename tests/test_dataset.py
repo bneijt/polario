@@ -10,14 +10,19 @@ from polario.delta_dataset import DeltaDataset
 from polario.hive_dataset import HiveDataset
 
 
-def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
+def assert_equal(
+    a: pl.DataFrame,
+    b: pl.DataFrame,
+    reason: str,
+) -> None:
     """Assert two dataframes are equal"""
-    assert sorted(a.columns) == sorted(b.columns), "Should have the same columns"
-    assert a.schema == b.schema, "Should have the same schema"
+    schema_a = {k: v for k, v in a.schema.items()}
+    schema_b = {k: v for k, v in b.schema.items()}
+    assert schema_a == schema_b, "Should have the same schema"
     column_order = list(sorted(a.columns))
 
     def comparable_repr(df: pl.DataFrame) -> dict:
-        return df.select(column_order).sort(column_order).to_dict(as_series=False)
+        return df.select_seq(column_order).sort(column_order).to_dict(as_series=False)
 
     assert comparable_repr(a) == comparable_repr(b), reason
 

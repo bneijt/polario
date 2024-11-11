@@ -176,7 +176,8 @@ class HivePartition:
                     return df
 
             complete_fragements = [
-                add_missing_columns(f).select(superset_schema.keys()) for f in fragments
+                add_missing_columns(f).select_seq(superset_schema.keys())
+                for f in fragments
             ]
         else:
             complete_fragements = fragments
@@ -208,7 +209,7 @@ class HivePartition:
         output_columns = list(
             sorted(set(df.columns) - self.partition_column_values.keys())
         )
-        for fragment_df in df.select(output_columns).iter_slices(
+        for fragment_df in df.select_seq(output_columns).iter_slices(
             self.maximum_rows_per_fragment
         ):
             target_fragment.write(fragment_df)
@@ -385,7 +386,7 @@ class HiveDataset:
                 ),
             )
         else:
-            partition_values = df.select(self.partition_columns).unique().to_dicts()
+            partition_values = df.select_seq(self.partition_columns).unique().to_dicts()
             for partition_value in partition_values:
                 yield (
                     df.filter(
