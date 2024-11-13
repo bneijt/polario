@@ -5,3 +5,4 @@ __pycache__
 /tmp
 .env
 polario/_version.py
+constraints.txt

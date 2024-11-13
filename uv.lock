@@ -698,11 +698,12 @@ wheels = [
 
 [[package]]
 name = "polario"
-version = "0.3.2.dev6+g3fbdf48.d20241110"
+version = "0.3.2.dev7+g105adeb.d20241113"
 source = { editable = "." }
 dependencies = [
     { name = "fsspec" },
     { name = "polars", extra = ["fsspec"] },
+    { name = "pyarrow" },
 ]
 
 [package.dev-dependencies]
@@ -718,6 +719,7 @@ dev = [
 requires-dist = [
     { name = "fsspec" },
     { name = "polars", extras = ["fsspec"], specifier = ">=0.16" },
+    { name = "pyarrow", specifier = ">=18.0.0" },
 ]
 
 [package.metadata.requires-dev]

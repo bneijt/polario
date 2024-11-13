@@ -11,7 +11,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
 ]
-dependencies = ["fsspec", "polars[fsspec]>=0.16"]
+dependencies = [
+    "fsspec",
+    "polars[fsspec]>=0.16",
+    "pyarrow>11",
+]
 
 [project.urls]
 homepage = "https://bneijt.github.io/polario/"
