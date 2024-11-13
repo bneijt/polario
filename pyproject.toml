@@ -1,39 +1,42 @@
-[tool.poetry]
+[project]
 name = "polario"
-version = "0.0.1"
+dynamic = ["version"]
 description = "Polars IO"
-authors = ["Bram Neijt <bram@neijt.nl>"]
+authors = [{ name = "Bram Neijt", email = "bram@neijt.nl" }]
 readme = "README.md"
 license = "Apache-2.0"
-homepage = "https://bneijt.github.io/polario/"
-repository = "https://github.com/bneijt/polario"
+requires-python = ">=3.9"
 classifiers = [
     "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
 ]
+dependencies = ["fsspec", "polars[fsspec]>=0.16"]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-polars = { extras = ["fsspec"], version = ">=0.16" }
-fsspec = "*"
+[project.urls]
+homepage = "https://bneijt.github.io/polario/"
+repository = "https://github.com/bneijt/polario"
 
-[tool.poetry.group.dev.dependencies]
-black = { version = "^23.1.0", allow-prereleases = true }
-mypy = "^1.0.1"
-pytest = "^7.2.1"
-pdoc = "^13.0.0"
-twine = "^4.0.2"
-isort = "^5.12.0"
-pre-commit = "^3.1.0"
-ruff = "^0.0.259"
-deltalake = "^0.10.0"
-s3fs = "^2023.6.0"
+[tool.uv]
+dev-dependencies = [
+    "deltalake>=0.21.0",
+    "parquet-tools>=0.2.16",
+    "pdoc>=15.0.0",
+    "pytest>=8.3.3",
+    "s3fs>=2024.10.0",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
-[tool.poetry.scripts]
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "polario/_version.py"
+
+[project.scripts]
 polario = 'polario.main:main'
 
 [tool.isort]
@@ -44,5 +47,18 @@ files = "polario,tests"
 ignore_missing_imports = true
 show_error_codes = true
 
-[tool.ruff]
-ignore = ["E501"]
+[tool.ruff.lint]
+ignore = ["E501", "UP006", "FA100", "N803", "UP035", "UP007", "ANN101"]
+extend-select = [
+    "ANN",
+    "B",
+    "E",
+    "FA",
+    "I",
+    "INP",
+    "N",
+    "Q",
+    "RUF",
+    "SIM",
+    "UP",
+]

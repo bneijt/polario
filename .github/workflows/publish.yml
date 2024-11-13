@@ -8,27 +8,16 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      POETRY_VIRTUALENVS_IN_PROJECT: true
+    environment: release
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - name: cache venv
-        uses: actions/cache@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-      - name: install poetry
-        run: pip install poetry==1.3.2
-      - name: poetry install
-        run: poetry install
-      - name: build and publish
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          poetry version ${{ github.event.release.tag_name }}
-          poetry build
-          poetry run twine upload dist/*
+          version: "0.5.1"
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@release/v1

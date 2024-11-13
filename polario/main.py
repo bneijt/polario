@@ -1,5 +1,5 @@
-"""Main CLI interface
-"""
+"""Main CLI interface"""
+
 import argparse
 import json
 import sys
@@ -30,7 +30,7 @@ def main() -> int:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s {version}".format(version=__version__),
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
         "cmd",

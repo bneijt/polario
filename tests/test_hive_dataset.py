@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import os
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import polars as pl
 import pytest
@@ -10,14 +12,30 @@ from polario import unwrap
 from polario.hive_dataset import HiveDataset, to_relative_location_from
 
 
-def assert_equal(a: pl.DataFrame, b: pl.DataFrame, reason: str) -> None:
+def assert_equal(
+    a: pl.DataFrame,
+    b: pl.DataFrame,
+    reason: str,
+    partition_columns: list[str] | None = None,
+) -> None:
     """Assert two dataframes are equal"""
-    assert sorted(a.columns) == sorted(b.columns), "Should have the same columns"
-    assert a.schema == b.schema, "Should have the same schema"
+    pcols = set(partition_columns or [])
+
+    assert (
+        [c for c in a.columns if c not in pcols]
+        == [c for c in b.columns if c not in pcols]
+    ), "Should have the same columns, in the same ordering, when ignoring partition columns"
+    assert pcols - set(a.columns) == set(), "A should have all partition columns"
+    assert pcols - set(b.columns) == set(), "B should have all partition columns"
+
+    assert dict(a.schema.items()) == dict(
+        b.schema.items()
+    ), "Should have the same types"
+
     column_order = list(sorted(a.columns))
 
     def comparable_repr(df: pl.DataFrame) -> dict:
-        return df.select(column_order).sort(column_order).to_dict(as_series=False)
+        return df.select_seq(column_order).sort(column_order).to_dict(as_series=False)
 
     assert comparable_repr(a) == comparable_repr(b), reason
 
@@ -129,13 +147,13 @@ def test_read_partion_should_read_single_partition(example_ds_1: HiveDataset) ->
 
 
 def test_read_partition_should_raise_if_not_found(example_ds_1: HiveDataset) -> None:
-    example_ds_1.read_partition({"p1": "not_there", "p2": "a"}) is None
+    assert example_ds_1.read_partition({"p1": "not_there", "p2": "a"}) is None
 
 
 def test_append_should_add_data(
     example_ds_1: HiveDataset, example_df_1: pl.DataFrame
 ) -> None:
-    for i in range(10):
+    for _i in range(10):
         example_ds_1.append(example_df_1)
     assert (
         unwrap(example_ds_1.scan()).collect().shape[1] == example_df_1.shape[1]
@@ -156,10 +174,16 @@ def test_should_support_schema_evolution() -> None:
         ds.write(pl.from_dicts([row_b]))
         partitions = list(ds.read_partitions())
         assert_equal(
-            partitions[0], pl.from_dicts([row_a]), "Should read back all the data"
+            partitions[0],
+            pl.from_dicts([row_a]),
+            "Should read back all the data",
+            ["p"],
         )
         assert_equal(
-            partitions[1], pl.from_dicts([row_b]), "Should read back all the data"
+            partitions[1],
+            pl.from_dicts([row_b]),
+            "Should read back all the data",
+            ["p"],
         )
 
         # Test append on the same partition
@@ -169,6 +193,7 @@ def test_should_support_schema_evolution() -> None:
             partitions[0],
             pl.from_dicts([row_a, row_c]),
             "Should read back all the data",
+            ["p"],
         )
 
 
