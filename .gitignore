@@ -4,3 +4,4 @@ __pycache__
 /dist
 /tmp
 .env
+polario/_version.py
