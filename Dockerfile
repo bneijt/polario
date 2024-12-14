@@ -18,21 +18,22 @@ RUN --mount=type=cache,target=/root/.cache \
 
 COPY pyproject.toml uv.lock /app/
 
-RUN uv pip compile pyproject.toml -o requirements.txt
-
+RUN uv export --format requirements-txt --output-file /requirements.txt \
+    --no-editable --no-dev --no-emit-workspace --frozen \
+    --no-index
 
 FROM dev-base AS install
 
-COPY --from=compile /app/requirements.txt /app/requirements.txt
+COPY --from=compile /requirements.txt /requirements.txt
 
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=secret,id=pip_index,env=PIP_INDEX_URL \
     --mount=type=secret,id=pip_index,env=PIP_EXTRA_INDEX_URL \
     pip install \
-    --disable-pip-version-check \
+    --no-deps --disable-pip-version-check \
     --target /app \
-    --requirement /app/requirements.txt \
-    && rm /app/requirements.txt
+    --requirement /requirements.txt
+
 
 ADD dist/*.whl /tmp
 
@@ -40,8 +41,7 @@ RUN --mount=type=cache,target=/root/.cache \
     --mount=type=secret,id=pip_index,env=PIP_INDEX_URL \
     --mount=type=secret,id=pip_index,env=PIP_EXTRA_INDEX_URL \
     pip install \
-    --disable-pip-version-check \
-    --no-deps \
+    --no-deps --disable-pip-version-check \
     --target /app \
     /tmp/*.whl
 
