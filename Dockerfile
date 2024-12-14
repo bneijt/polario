@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/root/.cache \
     --mount=type=secret,id=pip_index,env=PIP_EXTRA_INDEX_URL \
     pip install \
     --no-deps --disable-pip-version-check \
-    --target /app \
+    --target /env \
     --requirement /requirements.txt
 
 
@@ -53,7 +53,8 @@ RUN --mount=type=cache,target=/root/.cache \
     /tmp/*.whl
 
 FROM gcr.io/distroless/python3-debian12:nonroot
+COPY --from=install /env /env
 COPY --from=install /app /app
 WORKDIR /app
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/env
 ENTRYPOINT [ "/usr/bin/python", "-m", "polario.main" ]
